@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <div class="h1">Abbreviazioni</div>
+      <div class="h2">Categorie (CAT) e Tipi (TIPO)</div>
+    </div>
+    <a class="btn" href="/pn">← P/N</a>
+  </div>
+  <br/>
+	{% if msg %}
+	  <div class="pill" style="border-color: rgba(255,204,102,.35); color: var(--warn);">
+		{{ msg }}
+	  </div>
+	  <br/>
+	{% endif %}
+
+  <div class="grid">
+    <div class="card" style="padding:14px">
+      <div class="h2">Aggiungi abbreviazione</div>
+      <form method="post" action="/admin/abbreviations/add">
+        <div class="grid">
+          <div class="field">
+            <label>Kind</label>
+            <select name="kind" required>
+              <option value="CAT">CAT</option>
+              <option value="TIPO">TIPO</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Abbreviazione</label>
+            <input name="abbr" placeholder="es: MEC" required>
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="field">
+          <label>Nome</label>
+          <input name="name" placeholder="es: Meccanica" required>
+        </div>
+
+        <div style="height:12px"></div>
+        <button class="btn primary" type="submit">Salva</button>
+      </form>
+
+      <div class="help" style="margin-top:10px">
+        Suggerimento: inserisci prima le CAT e poi i TIPO.
+        Le dropdown in “Nuovo P/N” si popolano da qui.
+      </div>
+    </div>
+
+    <div class="card" style="padding:14px">
+      <div class="h2">Categorie (CAT)</div>
+      <table class="table">
+        <tr><th>Abbr</th><th>Nome</th><th></th></tr>
+        {% for a in cats %}
+        <tr>
+          <td class="mono">{{ a.abbr }}</td>
+          <td>{{ a.name }}</td>
+          <td style="width:1%">
+            <form method="post" action="/admin/abbreviations/{{ a.id }}/delete" style="margin:0">
+              <button class="btn danger" type="submit">Elimina</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if cats|length == 0 %}
+        <tr><td colspan="3" class="help">Nessuna categoria inserita.</td></tr>
+        {% endif %}
+      </table>
+
+      <div style="height:16px"></div>
+
+      <div class="h2">Tipi (TIPO)</div>
+      <table class="table">
+        <tr><th>Abbr</th><th>Nome</th><th></th></tr>
+        {% for a in tipos %}
+        <tr>
+          <td class="mono">{{ a.abbr }}</td>
+          <td>{{ a.name }}</td>
+          <td style="width:1%">
+            <form method="post" action="/admin/abbreviations/{{ a.id }}/delete" style="margin:0">
+              <button class="btn danger" type="submit">Elimina</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if tipos|length == 0 %}
+        <tr><td colspan="3" class="help">Nessun tipo inserito.</td></tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Lista P/N</title></head>
+
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between">
+    <div>
+      <div class="h1">Part Number</div>
+      <div class="h2">Ultimi 200</div>
+    </div>
+    <a class="btn primary" href="/pn/new">+ Nuovo</a>
+  </div>
+	  <form method="get" action="/pn">
+    <div class="row" style="gap:10px">
+      <div class="field" style="flex:1; min-width:260px;">
+        <label>Cerca</label>
+        <input name="q" value="{{ q or '' }}" placeholder="P/N, descrizione, codice fornitore...">
+      </div>
+
+      <div class="field" style="width:220px;">
+        <label>Stato</label>
+        <select name="stato">
+          <option value="" {% if not stato %}selected{% endif %}>Tutti</option>
+          <option value="BOZZA" {% if stato=="BOZZA" %}selected{% endif %}>BOZZA</option>
+          <option value="RILASCIATO" {% if stato=="RILASCIATO" %}selected{% endif %}>RILASCIATO</option>
+          <option value="OBSOLETO" {% if stato=="OBSOLETO" %}selected{% endif %}>OBSOLETO</option>
+        </select>
+      </div>
+
+      <div style="align-self:flex-end;">
+        <button class="btn primary" type="submit">Cerca</button>
+        <a class="btn" href="/pn">Reset</a>
+      </div>
+    </div>
+  </form>
+
+  <div style="height:14px"></div>
+
+  <table class="table">
+    <tr>
+      <th>P/N</th><th>Descrizione</th><th>Classif.</th><th>Stato</th><th>Creato</th>
+    </tr>
+    {% for it in items %}
+    <tr>
+      <td class="mono"><a href="/pn/{{ it.pn }}">{{ it.pn }}</a></td>
+      <td>{{ it.descrizione or "" }}</td>
+      <td>{{ it.classificazione }}</td>
+      <td>
+        {% if it.stato == "BOZZA" %}<span class="badge bozza">BOZZA</span>{% endif %}
+        {% if it.stato == "RILASCIATO" %}<span class="badge rilasciato">RILASCIATO</span>{% endif %}
+        {% if it.stato == "OBSOLETO" %}<span class="badge obsoleto">OBSOLETO</span>{% endif %}
+      </td>
+      <td>{{ it.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
+
+<body>
+  <a href="/">← Home</a>
+  <h2>Lista Part Number (ultimi 200)</h2>
+  <table border="1" cellpadding="6" cellspacing="0">
+    <tr>
+      <th>P/N</th><th>Descrizione</th><th>Classif.</th><th>Stato</th><th>Creato</th>
+    </tr>
+    {% for it in items %}
+    <tr>
+      <td><a href="/pn/{{ it.pn }}">{{ it.pn }}</a></td>
+      <td>{{ it.descrizione or "" }}</td>
+      <td>{{ it.classificazione }}</td>
+      <td>{{ it.stato }}</td>
+      <td>{{ it.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

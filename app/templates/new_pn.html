@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <div class="h1">Nuovo Part Number</div>
+      <div class="h2">Generazione codice e anagrafica</div>
+    </div>
+    <a class="btn" href="/pn">← Lista P/N</a>
+  </div>
+
+  {% if error %}<div class="error">{{ error }}</div><br/>{% endif %}
+
+  <form method="post" action="/pn/new">
+    <div class="grid">
+      <div class="field">
+        <label>Categoria (CAT)</label>
+        <select name="cat_abbr" required>
+          {% for c in cats %}
+            <option value="{{ c.abbr }}">{{ c.name }} ({{ c.abbr }})</option>
+          {% endfor %}
+        </select>
+        <div class="help">Deriva dalle abbreviazioni importate</div>
+      </div>
+
+      <div class="field">
+        <label>Tipo (TIPO)</label>
+        <select name="tipo_abbr" required>
+          {% for t in tipos %}
+            <option value="{{ t.abbr }}">{{ t.name }} ({{ t.abbr }})</option>
+          {% endfor %}
+        </select>
+        <div class="help">Deriva dalle abbreviazioni importate</div>
+      </div>
+
+      <div class="field">
+        <label>Revisione</label>
+        <input name="rev" value="1" required>
+        <div class="help">Esempio: 1, 2, A, B…</div>
+      </div>
+
+      <div class="field">
+        <label>Valore (opzionale)</label>
+        <input name="val" placeholder="es: 80 / b / 10k / M3">
+      </div>
+    </div>
+
+    <br/>
+
+    <div class="field">
+      <label>Descrizione</label>
+      <input name="descrizione" style="width:100%" placeholder="Descrizione chiara e breve">
+    </div>
+
+    <br/>
+
+    <div class="grid">
+      <div class="field">
+        <label>Classificazione</label>
+        <select name="classificazione">
+          <option value="BUY">BUY (acquistato)</option>
+          <option value="MAKE">MAKE (a disegno / interno)</option>
+          <option value="STANDARD">STANDARD</option>
+        </select>
+        <div class="help">Serve per coerenza dati e acquisti</div>
+      </div>
+
+      <div class="field">
+        <label>Fornitore (solo BUY)</label>
+        <select name="supplier_id">
+          <option value="">—</option>
+          {% for s in suppliers %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="help"><a href="/suppliers">Gestisci fornitori</a></div>
+      </div>
+
+      <div class="field">
+        <label>Codice fornitore</label>
+        <input name="supplier_pn" placeholder="MPN / codice interno fornitore">
+      </div>
+
+      <div class="field">
+        <label>Costo standard</label>
+        <input name="costo_standard" placeholder="es: 12,50">
+      </div>
+
+      <div class="field">
+        <label>Valuta</label>
+        <input name="valuta" value="EUR">
+      </div>
+
+      <div class="field">
+        <label>Unità di misura</label>
+        <input name="unita_misura" placeholder="pz / m / kg">
+      </div>
+
+      <div class="field">
+        <label>MOQ</label>
+        <input name="moq" placeholder="es: 10">
+      </div>
+
+      <div class="field">
+        <label>Lead time (giorni)</label>
+        <input name="lead_time_giorni" placeholder="es: 14">
+      </div>
+    </div>
+
+    <br/>
+
+    <div class="grid">
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Link (datasheet / pagina)</label>
+        <input name="link" placeholder="https://...">
+      </div>
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Note</label>
+        <textarea name="note" placeholder="Note tecniche / note acquisto"></textarea>
+      </div>
+    </div>
+
+    <br/>
+
+    <div class="row">
+      <button class="btn primary" type="submit">Crea P/N</button>
+      <a class="btn" href="/pn">Annulla</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

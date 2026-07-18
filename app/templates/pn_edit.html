@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <div class="h1">Modifica P/N</div>
+      <div class="h2 mono">{{ item.pn }}</div>
+    </div>
+    <a class="btn" href="/pn/{{ item.pn }}">&larr; Dettaglio</a>
+  </div>
+
+  {% if item.stato == "RILASCIATO" %}
+    <div class="pill" style="border-color: rgba(255,204,102,.35); color: var(--warn);">
+      Questo P/N e <b>RILASCIATO</b>: puoi aggiornare i campi anagrafici (fornitore/costo/link/note ecc.).
+      Il codice P/N non cambia.
+    </div>
+    <br/>
+  {% endif %}
+
+  {% if error %}<div class="error">{{ error }}</div><br/>{% endif %}
+  {% if revision_error %}<div class="error">{{ revision_error }}</div><br/>{% endif %}
+
+  <form method="post" action="/pn/{{ item.pn }}/edit">
+    <div class="field">
+      <label>Descrizione</label>
+      <input name="descrizione" value="{{ item.descrizione or '' }}">
+    </div>
+
+    <br/>
+
+    <div class="grid">
+      <div class="field">
+        <label>Classificazione</label>
+        <select name="classificazione">
+          <option value="BUY" {% if item.classificazione=="BUY" %}selected{% endif %}>BUY</option>
+          <option value="MAKE" {% if item.classificazione=="MAKE" %}selected{% endif %}>MAKE</option>
+          <option value="STANDARD" {% if item.classificazione=="STANDARD" %}selected{% endif %}>STANDARD</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Fornitore</label>
+        <select name="supplier_id">
+          <option value="">-</option>
+          {% for s in suppliers %}
+            <option value="{{ s.id }}" {% if item.supplier_id==s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Codice fornitore</label>
+        <input name="supplier_pn" value="{{ item.supplier_pn or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Costo standard</label>
+        <input name="costo_standard" value="{{ item.costo_standard or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Valuta</label>
+        <input name="valuta" value="{{ item.valuta or 'EUR' }}">
+      </div>
+
+      <div class="field">
+        <label>Unita di misura</label>
+        <input name="unita_misura" value="{{ item.unita_misura or '' }}">
+      </div>
+
+      <div class="field">
+        <label>MOQ</label>
+        <input name="moq" value="{{ item.moq or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Lead time (giorni)</label>
+        <input name="lead_time_giorni" value="{{ item.lead_time_giorni or '' }}">
+      </div>
+    </div>
+
+    <br/>
+
+    <div class="grid">
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Link</label>
+        <input name="link" value="{{ item.link or '' }}">
+      </div>
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Note</label>
+        <textarea name="note">{{ item.note or '' }}</textarea>
+      </div>
+    </div>
+
+    <br/>
+    <div class="row">
+      <button class="btn primary" type="submit">Salva</button>
+      <a class="btn" href="/pn/{{ item.pn }}">Annulla</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="h2">Nuova revisione</div>
+  <div class="help">
+    Genera un nuovo P/N partendo da questo codice. Il nuovo record copia dati anagrafici e BOM del codice corrente e nasce in stato BOZZA.
+  </div>
+  <br/>
+
+  <form method="post" action="/pn/{{ item.pn }}/revision">
+    <div class="row" style="align-items:flex-end; gap:12px;">
+      <div class="field" style="min-width:220px;">
+        <label>Nuova revisione</label>
+        <input name="new_rev" value="{{ suggested_rev or '' }}" required>
+      </div>
+      <button class="btn primary" type="submit">Genera nuova versione</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="h2">Stato</div>
+  <div class="help">Stato attuale: <b>{{ item.stato }}</b></div>
+  <br/>
+
+  {% if item.stato != "OBSOLETO" %}
+    <form method="post" action="/pn/{{ item.pn }}/obsolete">
+      <button class="btn danger" type="submit">Imposta obsoleto</button>
+    </form>
+  {% else %}
+    <div class="pill">Questo P/N e gia obsoleto.</div>
+  {% endif %}
+</div>
+{% endblock %}

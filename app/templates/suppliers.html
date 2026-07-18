@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <div class="h1">Fornitori</div>
+      <div class="h2">Anagrafica e riferimenti</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card" style="padding:14px">
+      <div class="h2">Aggiungi fornitore</div>
+
+      <form method="post" action="/suppliers">
+        <div class="field">
+          <label>Ragione sociale *</label>
+          <input name="name" required>
+        </div>
+        <div style="height:10px"></div>
+        <div class="field">
+          <label>Email</label>
+          <input name="email">
+        </div>
+        <div style="height:10px"></div>
+        <div class="field">
+          <label>Telefono</label>
+          <input name="phone">
+        </div>
+        <div style="height:10px"></div>
+        <div class="field">
+          <label>Note</label>
+          <input name="note">
+        </div>
+        <div style="height:12px"></div>
+        <button class="btn primary" type="submit">Salva</button>
+      </form>
+    </div>
+
+    <div class="card" style="padding:14px">
+      <div class="h2">Elenco</div>
+      <table class="table">
+        <tr><th>ID</th><th>Nome</th><th>Email</th><th>Telefono</th></tr>
+        {% for s in suppliers %}
+          <tr>
+            <td class="mono">{{ s.id }}</td>
+            <td><a href="/suppliers/{{ s.id }}">{{ s.name }}</a></td>
+            <td>{{ s.email or "" }}</td>
+            <td>{{ s.phone or "" }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

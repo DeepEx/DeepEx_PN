@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <div class="h1">Fornitore</div>
+      <div class="h2">{{ s.name }}</div>
+    </div>
+    <a class="btn" href="/suppliers">← Elenco</a>
+  </div>
+
+  <form method="post" action="/suppliers/{{ s.id }}">
+    <div class="grid">
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Ragione sociale *</label>
+        <input name="name" required value="{{ s.name }}">
+      </div>
+
+      <div class="field">
+        <label>P.IVA</label>
+        <input name="piva" value="{{ s.piva or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Nazione</label>
+        <input name="nazione" value="{{ s.nazione or 'IT' }}">
+      </div>
+
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Indirizzo</label>
+        <input name="indirizzo" value="{{ s.indirizzo or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Città</label>
+        <input name="citta" value="{{ s.citta or '' }}">
+      </div>
+
+      <div class="field">
+        <label>CAP</label>
+        <input name="cap" value="{{ s.cap or '' }}">
+      </div>
+
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Sito web</label>
+        <input name="sito_web" value="{{ s.sito_web or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Email aziendale</label>
+        <input name="email" value="{{ s.email or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Telefono aziendale</label>
+        <input name="phone" value="{{ s.phone or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Referente (nome)</label>
+        <input name="referente_nome" value="{{ s.referente_nome or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Referente (email)</label>
+        <input name="referente_email" value="{{ s.referente_email or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Referente (tel)</label>
+        <input name="referente_tel" value="{{ s.referente_tel or '' }}">
+      </div>
+
+      <div class="field" style="grid-column:1 / -1;">
+        <label>IBAN</label>
+        <input name="iban" value="{{ s.iban or '' }}">
+      </div>
+
+      <div class="field">
+        <label>Condizioni pagamento</label>
+        <input name="payment_terms" value="{{ s.payment_terms or '' }}" placeholder="es: 30gg DF">
+      </div>
+
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Note</label>
+        <textarea name="note">{{ s.note or '' }}</textarea>
+      </div>
+    </div>
+
+    <br/>
+    <div class="row">
+      <button class="btn primary" type="submit">Salva</button>
+      <a class="btn" href="/suppliers">Annulla</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

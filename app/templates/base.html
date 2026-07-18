@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "DeepEx – P/N" }}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="header">
+    <div class="header-inner">
+      <div class="brand">DeepEx <small>Gestione Part Number</small></div>
+
+      {% if user %}
+      <div class="nav">
+        <a href="/">Home</a>
+        <a href="/pn">P/N</a>
+        <a href="/pn/new">Nuovo</a>
+        <a href="/suppliers">Fornitori</a>
+		<a href="/admin/abbreviations">Abbreviazioni</a>
+      </div>
+      {% endif %}
+
+      <div class="right">
+        {% if user %}
+          <span class="pill">Utente: <b>{{ user }}</b></span>
+          <form method="post" action="/logout" style="margin:0">
+            <button class="btn ghost" type="submit">Logout</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

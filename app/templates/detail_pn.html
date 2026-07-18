@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <div class="h1 mono">{{ item.pn }}</div>
+      <div class="h2">{{ item.descrizione or "" }}</div>
+    </div>
+
+    <div class="row" style="gap:8px;">
+      <!-- Torna alla lista -->
+      <a class="btn" href="/pn">← Lista</a>
+
+      <!-- BOM sempre disponibile -->
+      <a class="btn" href="/pn/{{ item.pn }}/bom">BOM</a>
+
+      <!-- Modifica: tutto tranne OBSOLETO -->
+      {% if item.stato != "OBSOLETO" %}
+        <a class="btn" href="/pn/{{ item.pn }}/edit">Modifica</a>
+      {% endif %}
+
+      <!-- Rilascia: solo BOZZA -->
+      {% if item.stato == "BOZZA" %}
+        <form method="post" action="/pn/{{ item.pn }}/release" style="margin:0">
+          <button class="btn primary" type="submit">Rilascia</button>
+        </form>
+      {% endif %}
+
+      <!-- Obsoleto: solo RILASCIATO -->
+      {% if item.stato == "RILASCIATO" %}
+        <form method="post" action="/pn/{{ item.pn }}/obsolete" style="margin:0">
+          <button class="btn danger" type="submit">Obsoleto</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+
+  <br/>
+
+  <div class="row">
+    {% if item.stato == "BOZZA" %}<span class="badge bozza">BOZZA</span>{% endif %}
+    {% if item.stato == "RILASCIATO" %}<span class="badge rilasciato">RILASCIATO</span>{% endif %}
+    {% if item.stato == "OBSOLETO" %}<span class="badge obsoleto">OBSOLETO</span>{% endif %}
+    <span class="pill mono">{{ item.cat_abbr }}-{{ item.tipo_abbr }}-{{ "%04d"|format(item.progressivo) }}-{{ item.rev }}{% if item.val %}-{{ item.val }}{% endif %}</span>
+  </div>
+
+  <br/>
+
+  <div class="grid">
+    <div class="card" style="padding:14px">
+      <div class="h2">Acquisto</div>
+      <div class="row"><span class="pill">Classificazione: <b>{{ item.classificazione }}</b></span></div>
+      <div style="height:10px"></div>
+      <div class="help">Fornitore: <b>{{ item.supplier.name if item.supplier else "" }}</b></div>
+      <div class="help">Codice fornitore: <span class="mono">{{ item.supplier_pn or "" }}</span></div>
+      <div class="help">Costo standard: <b>{{ item.costo_standard or "" }}</b> {{ item.valuta or "" }}</div>
+    </div>
+
+    <div class="card" style="padding:14px">
+      <div class="h2">Dati tecnici</div>
+      <div class="help">Unità di misura: <b>{{ item.unita_misura or "" }}</b></div>
+      <div class="help">MOQ: <b>{{ item.moq or "" }}</b></div>
+      <div class="help">Lead time (giorni): <b>{{ item.lead_time_giorni or "" }}</b></div>
+      <div style="height:10px"></div>
+      <div class="help">
+        Link:
+        {% if item.link %}
+          <a href="{{ item.link }}" target="_blank">{{ item.link }}</a>
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card" style="padding:14px; grid-column:1 / -1;">
+      <div class="h2">Note</div>
+      <div>{{ item.note or "" }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

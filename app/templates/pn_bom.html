@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="row" style="justify-content:space-between; align-items:flex-end;">
+    <div>
+      <div class="h1">BOM</div>
+      <div class="h2 mono">{{ parent.pn }}</div>
+      <div class="help">{{ parent.descrizione or "" }}</div>
+    </div>
+    <div class="row">
+      <a class="btn" href="/pn/{{ parent.pn }}">← Dettaglio</a>
+    </div>
+  </div>
+
+  <br/>
+
+  {% if cycle_found %}
+    <div class="pill" style="border-color: rgba(255,79,109,.35); color: var(--danger);">
+      ⚠️ Ciclo BOM rilevato: <span class="mono">{{ " -> ".join(cycle_path) }}</span>
+    </div>
+    <br/>
+  {% else %}
+    <div class="row">
+      <span class="pill">Costo BOM: <b>{{ total_cost }}</b> {{ parent.valuta or "EUR" }}</span>
+      {% if missing_cost_pns and missing_cost_pns|length > 0 %}
+        <span class="pill" style="border-color: rgba(255,204,102,.35); color: var(--warn);">
+          Costi mancanti: {{ missing_cost_pns|length }}
+        </span>
+      {% endif %}
+    </div>
+
+    {% if missing_cost_pns and missing_cost_pns|length > 0 %}
+      <div style="height:10px"></div>
+      <div class="card" style="padding:14px; border-color: rgba(255,204,102,.25);">
+        <div class="h2">Componenti con costo mancante</div>
+        <div class="help">
+          {% for x in missing_cost_pns %}
+            <span class="pill mono">{{ x }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <br/>
+    {% endif %}
+  {% endif %}
+
+  <div class="grid">
+    <div class="card" style="padding:14px">
+      <div class="h2">Aggiungi componente</div>
+      <form method="post" action="/pn/{{ parent.pn }}/bom/add">
+        <div class="field" style="position:relative;">
+		  <label>Child P/N</label>
+		  <input id="child_pn_input" name="child_pn" placeholder="scrivi almeno 2 caratteri..." autocomplete="off" required>
+		  <div class="help">Cerca per P/N, descrizione o codice fornitore</div>
+
+		  <div id="pn_suggestions" class="card"
+			   style="display:none; position:absolute; left:0; right:0; top:74px; padding:8px; z-index:50;">
+		  </div>
+		</div>
+
+        <div style="height:10px"></div>
+
+        <div class="grid">
+          <div class="field">
+            <label>Quantità</label>
+            <input name="qty" placeholder="es: 2" required>
+          </div>
+          <div class="field">
+            <label>Sfrido % (opz.)</label>
+            <input name="scrap_pct" placeholder="es: 5">
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="field">
+          <label>Note (opz.)</label>
+          <input name="notes" placeholder="es: viti inox A4">
+        </div>
+
+        <div style="height:12px"></div>
+        <button class="btn primary" type="submit">Aggiungi</button>
+      </form>
+    </div>
+
+    <div class="card" style="padding:14px">
+      <div class="h2">Distinta</div>
+
+      <table class="table">
+        <tr>
+			<tr>
+			  <th>Child</th><th>Descrizione</th><th>Q.tà</th><th>Sfrido</th><th>Costo unit</th><th>Costo riga</th><th></th>
+			</tr>
+        </tr>
+
+        {% for r in line_costs %}
+        <tr>
+		  <td class="mono"><a href="/pn/{{ r.child_pn }}">{{ r.child_pn }}</a></td>
+		  <td>{{ r.child_desc or "" }}</td>
+		  <td>{{ r.qty }}</td>
+		  <td>{{ r.scrap_pct or "" }}</td>
+		  <td>{{ r.unit_cost }}</td>
+		  <td><b>{{ r.line_cost }}</b></td>
+		  <td style="width:1%">
+			<form method="post" action="/pn/{{ parent.pn }}/bom/{{ r.id }}/delete" style="margin:0">
+			  <button class="btn danger" type="submit">Rimuovi</button>
+			</form>
+		  </td>
+		</tr>
+
+        {% endfor %}
+
+        {% if line_costs|length == 0 %}
+        <tr><td colspan="6" class="help">Nessun componente in BOM.</td></tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  const input = document.getElementById("child_pn_input");
+  const box = document.getElementById("pn_suggestions");
+
+  let timer = null;
+  let lastQuery = "";
+
+  function hideBox() {
+    box.style.display = "none";
+    box.innerHTML = "";
+  }
+
+  function render(items) {
+    if (!items || items.length === 0) { hideBox(); return; }
+
+    box.innerHTML = "";
+    items.forEach(it => {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.style.justifyContent = "space-between";
+      row.style.alignItems = "center";
+      row.style.padding = "6px 8px";
+      row.style.borderRadius = "10px";
+      row.style.cursor = "pointer";
+
+      row.addEventListener("mouseenter", () => row.style.background = "rgba(255,255,255,.04)");
+      row.addEventListener("mouseleave", () => row.style.background = "transparent");
+
+      const left = document.createElement("div");
+      left.innerHTML = `<div class="mono" style="font-weight:700">${it.pn}</div>
+                        <div class="help" style="margin-top:2px">${it.descrizione || ""}</div>`;
+
+      const right = document.createElement("div");
+      right.innerHTML = `<span class="pill">${it.classificazione || ""}</span>`;
+
+      row.appendChild(left);
+      row.appendChild(right);
+
+      row.addEventListener("click", () => {
+        input.value = it.pn;
+        hideBox();
+        input.focus();
+      });
+
+      box.appendChild(row);
+    });
+
+    box.style.display = "block";
+  }
+
+  async function search(q) {
+    const url = `/api/pn/search?q=${encodeURIComponent(q)}&limit=12`;
+    const res = await fetch(url, { headers: { "Accept": "application/json" } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.items || [];
+  }
+
+  input.addEventListener("input", () => {
+    const q = (input.value || "").trim();
+    if (q.length < 2) { hideBox(); return; }
+
+    // debounce
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (q === lastQuery) return;
+      lastQuery = q;
+      const items = await search(q);
+      render(items);
+    }, 200);
+  });
+
+  // chiudi cliccando fuori
+  document.addEventListener("click", (e) => {
+    if (!box.contains(e.target) && e.target !== input) hideBox();
+  });
+
+  // ESC per chiudere
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") hideBox();
+  });
+})();
+</script>
+
+{% endblock %}
