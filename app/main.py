@@ -30,11 +30,16 @@ from sqlalchemy import func
 from models import Abbreviation, PartNumber
 from fastapi.responses import JSONResponse
 
+from api_v1 import router as api_v1_router
 
 
 app = FastAPI(title="DeepEx – Gestione Part Number")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(SessionMiddleware, secret_key=os.environ["SECRET_KEY"])
+
+# API di servizio read-only per DeepEx-Orchestrator (autenticazione Bearer,
+# separata dalla sessione browser).
+app.include_router(api_v1_router)
 
 templates = Jinja2Templates(directory="templates")
 

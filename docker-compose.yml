@@ -31,6 +31,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      DEEPEX_PN_API_TOKEN: ${DEEPEX_PN_API_TOKEN:-}
       APP_ENV: prod
     depends_on:
       db:
