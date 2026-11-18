@@ -118,6 +118,16 @@ def create_pn_revision(
         moq=source.moq,
         link=source.link,
         note=source.note,
+        # le proprieta fisiche partono da quelle della revisione sorgente: vanno riverificate
+        massa_secco_g=source.massa_secco_g,
+        peso_acqua_g=source.peso_acqua_g,
+        volume_cm3=source.volume_cm3,
+        dim_lunghezza_mm=source.dim_lunghezza_mm,
+        dim_larghezza_mm=source.dim_larghezza_mm,
+        dim_altezza_mm=source.dim_altezza_mm,
+        proprieta_fonte=source.proprieta_fonte,
+        proprieta_data=source.proprieta_data,
+        proprieta_note=source.proprieta_note,
     )
     db.add(obj)
     db.flush()

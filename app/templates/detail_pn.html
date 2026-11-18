@@ -74,6 +74,17 @@
       </div>
     </div>
 
+    <div class="card" style="padding:14px">
+      <div class="h2">Proprietà fisiche</div>
+      <div class="help">Massa a secco: <b>{% if item.massa_secco_g is not none %}{{ item.massa_secco_g }} g{% else %}—{% endif %}</b></div>
+      <div class="help">Peso in acqua dolce: <b>{% if item.peso_acqua_g is not none %}{{ item.peso_acqua_g }} g{% if item.peso_acqua_g < 0 %} (galleggia){% endif %}{% else %}—{% endif %}</b></div>
+      <div class="help">Volume: <b>{% if item.volume_cm3 is not none %}{{ item.volume_cm3 }} cm³{% else %}—{% endif %}</b></div>
+      <div class="help">Dimensioni L × W × H: <b>{{ item.dim_lunghezza_mm if item.dim_lunghezza_mm is not none else "—" }} × {{ item.dim_larghezza_mm if item.dim_larghezza_mm is not none else "—" }} × {{ item.dim_altezza_mm if item.dim_altezza_mm is not none else "—" }}</b> mm</div>
+      <div style="height:10px"></div>
+      <div class="help">Fonte: <b>{{ item.proprieta_fonte or "—" }}</b>{% if item.proprieta_data %} · {{ item.proprieta_data }}{% endif %}</div>
+      {% if item.proprieta_note %}<div class="help">{{ item.proprieta_note }}</div>{% endif %}
+    </div>
+
     <div class="card" style="padding:14px; grid-column:1 / -1;">
       <div class="h2">Note</div>
       <div>{{ item.note or "" }}</div>

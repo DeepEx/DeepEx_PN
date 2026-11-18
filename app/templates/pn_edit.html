@@ -93,6 +93,54 @@
     </div>
 
     <br/>
+    <div class="h2">Proprietà fisiche</div>
+    <div class="help">Per il bilancio masse e galleggiamento. Peso in acqua dolce: valore apparente, negativo se l'oggetto galleggia. Per i cilindri usare larghezza e altezza = diametro.</div>
+    <br/>
+    <div class="grid">
+      <div class="field">
+        <label>Massa a secco (g)</label>
+        <input name="massa_secco_g" inputmode="decimal" value="{{ item.massa_secco_g if item.massa_secco_g is not none else '' }}">
+      </div>
+      <div class="field">
+        <label>Peso in acqua dolce (g)</label>
+        <input name="peso_acqua_g" inputmode="decimal" value="{{ item.peso_acqua_g if item.peso_acqua_g is not none else '' }}">
+      </div>
+      <div class="field">
+        <label>Volume (cm³)</label>
+        <input name="volume_cm3" inputmode="decimal" value="{{ item.volume_cm3 if item.volume_cm3 is not none else '' }}">
+      </div>
+      <div class="field">
+        <label>Lunghezza (mm)</label>
+        <input name="dim_lunghezza_mm" inputmode="decimal" value="{{ item.dim_lunghezza_mm if item.dim_lunghezza_mm is not none else '' }}">
+      </div>
+      <div class="field">
+        <label>Larghezza / diametro (mm)</label>
+        <input name="dim_larghezza_mm" inputmode="decimal" value="{{ item.dim_larghezza_mm if item.dim_larghezza_mm is not none else '' }}">
+      </div>
+      <div class="field">
+        <label>Altezza / diametro (mm)</label>
+        <input name="dim_altezza_mm" inputmode="decimal" value="{{ item.dim_altezza_mm if item.dim_altezza_mm is not none else '' }}">
+      </div>
+      <div class="field">
+        <label>Fonte</label>
+        <select name="proprieta_fonte">
+          <option value="">-</option>
+          {% for src in (physical_sources or ["MISURATO", "CAD", "DATASHEET", "STIMATO"]) %}
+            <option value="{{ src }}" {% if item.proprieta_fonte==src %}selected{% endif %}>{{ src }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Data misura</label>
+        <input name="proprieta_data" type="date" value="{{ item.proprieta_data or '' }}">
+      </div>
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Note misura</label>
+        <input name="proprieta_note" value="{{ item.proprieta_note or '' }}">
+      </div>
+    </div>
+
+    <br/>
     <div class="row">
       <button class="btn primary" type="submit">Salva</button>
       <a class="btn" href="/pn/{{ item.pn }}">Annulla</a>
