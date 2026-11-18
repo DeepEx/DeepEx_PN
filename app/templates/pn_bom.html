@@ -14,6 +14,9 @@
 
   <br/>
 
+  {% if error %}<div class="error">{{ error }}</div><br/>{% endif %}
+  {% if message %}<div class="pill">{{ message }}</div><br/><br/>{% endif %}
+
   {% if cycle_found %}
     <div class="pill" style="border-color: rgba(255,79,109,.35); color: var(--danger);">
       ⚠️ Ciclo BOM rilevato: <span class="mono">{{ " -> ".join(cycle_path) }}</span>
@@ -21,7 +24,7 @@
     <br/>
   {% else %}
     <div class="row">
-      <span class="pill">Costo BOM: <b>{{ total_cost }}</b> {{ parent.valuta or "EUR" }}</span>
+      <span class="pill">Costo BOM: <b>{{ total_cost|dec(2) }}</b> {{ parent.valuta or "EUR" }}</span>
       {% if missing_cost_pns and missing_cost_pns|length > 0 %}
         <span class="pill" style="border-color: rgba(255,204,102,.35); color: var(--warn);">
           Costi mancanti: {{ missing_cost_pns|length }}
@@ -124,10 +127,10 @@
         <tr>
 		  <td class="mono"><a href="/pn/{{ r.child_pn }}">{{ r.child_pn }}</a></td>
 		  <td>{{ r.child_desc or "" }}</td>
-		  <td>{{ r.qty }}</td>
+		  <td>{{ r.qty|dec(4, 0) }}</td>
 		  <td>{{ r.scrap_pct or "" }}</td>
-		  <td>{{ r.unit_cost }}</td>
-		  <td><b>{{ r.line_cost }}</b></td>
+		  <td>{{ r.unit_cost|dec }}{% if r.missing %} <span title="Costo incompleto" style="color: var(--warn);">⚠</span>{% endif %}</td>
+		  <td><b>{{ r.line_cost|dec(2) }}</b></td>
 		  <td style="width:1%">
 			<form method="post" action="/pn/{{ parent.pn }}/bom/{{ r.id }}/delete" style="margin:0">
 			  <button class="btn danger" type="submit">Rimuovi</button>

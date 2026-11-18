@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="h1">Controlli costi e distinte</div>
+  <div class="help">Elenco dei dati gia presenti nel database da verificare a mano. Nessuna correzione e automatica.</div>
+</div>
+
+{% macro pnlist(items, empty) %}
+  {% if items|length == 0 %}<div class="help">{{ empty }}</div>
+  {% else %}
+    <table class="table">
+      <tr><th>P/N</th><th>Descrizione</th><th>Classificazione</th><th>Costo standard</th><th>Stato</th></tr>
+      {% for p in items %}
+      <tr>
+        <td class="mono"><a href="/pn/{{ p.pn }}">{{ p.pn }}</a></td>
+        <td>{{ p.descrizione or "" }}</td>
+        <td>{{ p.classificazione }}</td>
+        <td>{% if p.costo_standard is not none %}{{ p.costo_standard|dec }}{% else %}—{% endif %}</td>
+        <td>{{ p.stato }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+{% endmacro %}
+
+<div class="card">
+  <div class="h2">Assiemi con distinta ma non MAKE ({{ non_make_with_bom|length }})</div>
+  <div class="help">Il costo ora si calcola comunque dalla BOM; conviene riportarli a MAKE per coerenza.</div>
+  {{ pnlist(non_make_with_bom, "Nessuno.") }}
+</div>
+
+<div class="card">
+  <div class="h2">Componenti senza distinta con costo 0 ({{ zero_cost|length }})</div>
+  <div class="help">Probabili prezzi sotto il centesimo arrotondati a 0,00 dalla versione precedente: vanno reinseriti.</div>
+  {{ pnlist(zero_cost, "Nessuno.") }}
+</div>
+
+<div class="card">
+  <div class="h2">Componenti senza distinta e senza costo ({{ no_cost|length }})</div>
+  <div class="help">Esclusi gli obsoleti. Rendono incompleto il costo degli assiemi che li contengono.</div>
+  {{ pnlist(no_cost, "Nessuno.") }}
+</div>
+
+<div class="card">
+  <div class="h2">Righe di distinta doppie ({{ dup_rows|length }})</div>
+  {% if dup_rows|length == 0 %}<div class="help">Nessuna.</div>{% else %}
+  <table class="table">
+    <tr><th>Assieme</th><th>Componente</th><th>Righe</th></tr>
+    {% for parent, child, n in dup_rows %}
+    <tr><td class="mono"><a href="/pn/{{ parent }}/bom">{{ parent }}</a></td><td class="mono">{{ child }}</td><td>{{ n }}</td></tr>
+    {% endfor %}
+  </table>
+  <div class="help">Le quantita si sommano: verifica se erano volute. Reinserire il componente unifica le righe.</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="h2">Distinte che contengono se stesse ({{ self_refs|length }})</div>
+  {% if self_refs|length == 0 %}<div class="help">Nessuna.</div>{% else %}
+  {% for r in self_refs %}<a class="pill mono" href="/pn/{{ r.parent_pn }}/bom">{{ r.parent_pn }}</a> {% endfor %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="h2">Righe con componente inesistente ({{ missing_children|length }})</div>
+  {% if missing_children|length == 0 %}<div class="help">Nessuna.</div>{% else %}
+  {% for r in missing_children %}<div class="help mono"><a href="/pn/{{ r.parent_pn }}/bom">{{ r.parent_pn }}</a> → {{ r.child_pn }}</div>{% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

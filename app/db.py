@@ -47,3 +47,11 @@ def ensure_schema(bind=None):
     with bind.begin() as conn:
         for name, sql_type in PART_NUMBER_ADDED_COLUMNS:
             conn.execute(text(f"ALTER TABLE part_numbers ADD COLUMN IF NOT EXISTS {name} {sql_type}"))
+        # costo_standard era NUMERIC(12,2): i prezzi sotto il centesimo diventavano 0,00.
+        # Si allarga a NUMERIC(14,6) una sola volta (i valori gia arrotondati non si recuperano).
+        scale = conn.execute(text(
+            "SELECT numeric_scale FROM information_schema.columns "
+            "WHERE table_name = 'part_numbers' AND column_name = 'costo_standard'"
+        )).scalar()
+        if scale is not None and scale < 6:
+            conn.execute(text("ALTER TABLE part_numbers ALTER COLUMN costo_standard TYPE NUMERIC(14, 6)"))
