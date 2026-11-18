@@ -19,7 +19,8 @@ from pn import create_pn, create_pn_revision
 from models import Abbreviation, PartNumber
 
 from decimal import Decimal
-from bom import compute_unit_cost, compute_physical_rollup
+from bom import compute_unit_cost, compute_physical_rollup, effective_qty, would_create_cycle
+from numbers_it import parse_number, parse_positive, fmt_decimal
 from models import BOMItem
 from fastapi import Form
 from sqlalchemy import and_
@@ -38,6 +39,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(SessionMiddleware, secret_key=os.environ["SECRET_KEY"])
 
 templates = Jinja2Templates(directory="templates")
+templates.env.filters["dec"] = fmt_decimal
+# valore per i campi dei form: virgola decimale, cosi "1,234" non viene riletto come 1234
+templates.env.filters["dec_input"] = lambda v, n=6: "" if v is None else fmt_decimal(v, n, 0).replace(".", ",")
 
 @app.on_event("startup")
 def startup():
@@ -120,7 +124,7 @@ def new_pn_submit(
     user: str = Depends(require_user),
 ):
     try:
-        costo = float(costo_standard) if costo_standard.strip() else None
+        costo = parse_positive(costo_standard, "Costo standard")
         sup_id = int(supplier_id) if supplier_id.strip() else None
         sup_pn = supplier_pn.strip() or None
         desc = descrizione.strip() or None
@@ -300,17 +304,8 @@ from sqlalchemy.orm import Session
 from models import PartNumber, Supplier
 
 def _parse_price_eur(s: str | None):
-    if not s:
-        return None
-    s = s.strip()
-    if not s:
-        return None
-    # gestisce "12,50" e "12.50" e anche "€"
-    s = s.replace("€", "").replace(" ", "").replace(",", ".")
-    try:
-        return Decimal(s)
-    except InvalidOperation:
-        return None
+    # "12,50", "12.50", "1.234,56", "1234.56" e il simbolo €; ValueError se illeggibile o ambiguo
+    return parse_positive(s, "Prezzo")
 
 @app.post("/admin/pn/import")
 def import_existing_pn(
@@ -328,6 +323,7 @@ def import_existing_pn(
     created = 0
     updated = 0
     skipped = 0
+    errors = []
 
     for row in reader:
         codice = (row.get("Codice") or "").strip()
@@ -357,7 +353,12 @@ def import_existing_pn(
         link = (row.get("Link") or "").strip() or None
         supplier_name = (row.get("Fornitore") or "").strip() or None
         supplier_pn = (row.get("Codice Fornitore") or "").strip() or None
-        prezzo = _parse_price_eur(row.get("Prezzo (€)"))
+        try:
+            prezzo = _parse_price_eur(row.get("Prezzo (€)"))
+        except ValueError as e:
+            # il resto della riga si importa, il prezzo resta quello esistente
+            errors.append({"codice": codice, "errore": str(e)})
+            prezzo = None
 
         # "Valore" dal CSV (se vuoi salvarlo nelle note)
         valore_extra = (row.get("Valore") or "").strip() or None
@@ -419,10 +420,8 @@ def import_existing_pn(
                     obj.note = valore_extra
                     changed = True
 
-            # opzionale: se non aveva classificazione e ora ha fornitore
-            if supplier_id and obj.classificazione != "BUY":
-                obj.classificazione = "BUY"
-                changed = True
+            # la classificazione di un P/N esistente non si tocca: un assieme MAKE
+            # con fornitore (es. lavorazione esterna) non deve diventare BUY
 
             if changed:
                 updated += 1
@@ -430,7 +429,7 @@ def import_existing_pn(
                 skipped += 1
 
     db.commit()
-    return {"status": "ok", "created": created, "updated": updated, "skipped": skipped}
+    return {"status": "ok", "created": created, "updated": updated, "skipped": skipped, "errors": errors}
 
 @app.get("/suppliers/{supplier_id}", response_class=HTMLResponse)
 def supplier_detail(request: Request, supplier_id: int, db: Session = Depends(get_db)):
@@ -545,15 +544,9 @@ PHYSICAL_SOURCES = ["MISURATO", "CAD", "DATASHEET", "STIMATO"]
 
 
 def _parse_decimal_field(raw: str, label: str, allow_negative: bool = False):
-    value = (raw or "").strip().replace(" ", "").replace(",", ".")
-    if not value:
+    number = parse_number(raw, label)
+    if number is None:
         return None
-    try:
-        number = Decimal(value)
-    except Exception:
-        raise ValueError(f"{label}: valore numerico non valido ({raw}).")
-    if not number.is_finite():
-        raise ValueError(f"{label}: valore numerico non valido ({raw}).")
     if number < 0 and not allow_negative:
         raise ValueError(f"{label}: il valore non puo essere negativo.")
     return number.quantize(Decimal("0.1"))
@@ -622,8 +615,9 @@ def pn_edit_submit(
     if item.stato == "OBSOLETO":
         return RedirectResponse(f"/pn/{pn}", status_code=303)
 
-    # proprieta fisiche
+    # costo e proprieta fisiche: un valore non interpretabile e un errore, non un campo svuotato
     try:
+        costo = parse_positive(costo_standard, "Costo standard")
         phys = _parse_physical_form(
             massa_secco_g, peso_acqua_g, volume_cm3,
             dim_lunghezza_mm, dim_larghezza_mm, dim_altezza_mm,
@@ -658,14 +652,7 @@ def pn_edit_submit(
     lk = link.strip() or None
     nt = note.strip() or None
 
-    costo = None
-    if costo_standard.strip():
-        s = costo_standard.strip().replace("€", "").replace(" ", "").replace(",", ".")
-        try:
-            costo = float(s)
-        except ValueError:
-            costo = None
-
+    old_cost = item.costo_standard
     # update campi
     item.descrizione = desc
     item.classificazione = cl
@@ -680,6 +667,8 @@ def pn_edit_submit(
     item.note = nt
 
     phys_changes = {}
+    if (str(old_cost) if old_cost is not None else None) != (str(costo) if costo is not None else None):
+        phys_changes["costo_standard"] = {"da": None if old_cost is None else str(old_cost), "a": None if costo is None else str(costo)}
     for key, value in phys.items():
         old = getattr(item, key)
         if (str(old) if old is not None else None) != (str(value) if value is not None else None):
@@ -690,7 +679,7 @@ def pn_edit_submit(
     pn=item.pn,
     user=user,
     action="UPDATE_META",
-    details_json=json.dumps({"proprieta_fisiche": phys_changes}, ensure_ascii=False) if phys_changes else None,
+    details_json=json.dumps({"modifiche": phys_changes}, ensure_ascii=False) if phys_changes else None,
     ))
 
     db.commit()
@@ -771,7 +760,7 @@ def pn_obsolete(pn: str, request: Request, db: Session = Depends(get_db)):
 from sqlalchemy import or_
 
 @app.get("/pn/{pn}/bom", response_class=HTMLResponse)
-def pn_bom_page(pn: str, request: Request, db: Session = Depends(get_db)):
+def pn_bom_page(pn: str, request: Request, db: Session = Depends(get_db), err: str = "", msg: str = ""):
     user = get_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
@@ -798,10 +787,9 @@ def pn_bom_page(pn: str, request: Request, db: Session = Depends(get_db)):
     line_costs = []
     if not res.cycle_found:
         for r in rows:
-            child_cost = cache.get(r.child_pn, Decimal("0"))
-            qty = Decimal(str(r.qty))
-            scrap = Decimal(str(r.scrap_pct)) if r.scrap_pct is not None else Decimal("0")
-            qty_eff = qty * (Decimal("1") + (scrap / Decimal("100")))
+            child_res = cache.get(r.child_pn)
+            child_cost = child_res.cost if child_res else Decimal("0")
+            qty_eff = effective_qty(r)
             line_costs.append({
                 "id": r.id,
                 "child_pn": r.child_pn,
@@ -811,6 +799,7 @@ def pn_bom_page(pn: str, request: Request, db: Session = Depends(get_db)):
                 "notes": r.notes,
                 "unit_cost": child_cost,
                 "line_cost": qty_eff * child_cost,
+                "missing": bool(child_res and child_res.missing_cost_pns),
             })
 
 
@@ -828,7 +817,8 @@ def pn_bom_page(pn: str, request: Request, db: Session = Depends(get_db)):
             "cycle_path": res.cycle_path,
             "mass_rollup": mass_res,
             "water_rollup": water_res,
-            "error": None,
+            "error": err or None,
+            "message": msg or None,
         }
     )
 
@@ -850,44 +840,50 @@ def pn_bom_add(
     if not parent:
         return RedirectResponse("/pn", status_code=303)
 
+    def back(err: str = "", msg: str = ""):
+        q = f"?err={quote(err)}" if err else (f"?msg={quote(msg)}" if msg else "")
+        return RedirectResponse(f"/pn/{quote(pn)}/bom{q}", status_code=303)
+
     child_pn = (child_pn or "").strip()
     if not db.get(PartNumber, child_pn):
-        # child non esiste
-        return RedirectResponse(f"/pn/{pn}/bom", status_code=303)
-
-    # parsing qty
-    q = (qty or "").strip().replace(",", ".")
-    sp = (scrap_pct or "").strip().replace(",", ".")
+        return back(err=f"Il P/N {child_pn or '(vuoto)'} non esiste.")
+    if would_create_cycle(db, pn, child_pn):
+        return back(err=f"{child_pn} non puo stare nella BOM di {pn}: creerebbe un ciclo.")
 
     try:
-        qty_d = Decimal(q)
-    except Exception:
-        return RedirectResponse(f"/pn/{pn}/bom", status_code=303)
+        qty_d = parse_positive(qty, "Quantita", allow_zero=False)
+        sp_d = parse_positive(scrap_pct, "Scarto %")
+    except ValueError as e:
+        return back(err=str(e))
+    if qty_d is None:
+        return back(err="Quantita obbligatoria.")
+    if sp_d is not None and sp_d >= 100:
+        return back(err="Scarto %: deve essere inferiore a 100.")
 
-    sp_d = None
-    if sp:
-        try:
-            sp_d = Decimal(sp)
-        except Exception:
-            sp_d = None
+    existing = db.query(BOMItem).filter(BOMItem.parent_pn == pn, BOMItem.child_pn == child_pn).all()
+    if existing:
+        # niente righe doppie: si aggiorna la riga esistente con i nuovi valori
+        row = existing[0]
+        old = {"qty": str(row.qty), "scrap_pct": None if row.scrap_pct is None else str(row.scrap_pct)}
+        row.qty = qty_d
+        row.scrap_pct = sp_d
+        row.notes = notes.strip() or row.notes
+        for extra in existing[1:]:
+            db.delete(extra)
+        db.add(PNHistory(pn=pn, user=user, action="BOM_UPDATE", details_json=json.dumps(
+            {"child_pn": child_pn, "da": old, "a": {"qty": str(qty_d), "scrap_pct": None if sp_d is None else str(sp_d)}}, ensure_ascii=False)))
+        db.commit()
+        return back(msg=f"{child_pn} era gia in distinta: quantita aggiornata a {fmt_decimal(qty_d, 4, 0)}.")
 
-    obj = BOMItem(
+    db.add(BOMItem(
         parent_pn=pn,
         child_pn=child_pn,
         qty=qty_d,
         scrap_pct=sp_d,
         notes=(notes.strip() or None),
-    )
-    db.add(obj)
-
-    # storico
-    db.add(PNHistory(pn=pn, user=user, action="BOM_ADD", details_json=None))
-
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        # se UNIQUE(parent_pn, child_pn) rompe, non facciamo crash
+    ))
+    db.add(PNHistory(pn=pn, user=user, action="BOM_ADD", details_json=json.dumps({"child_pn": child_pn, "qty": str(qty_d)}, ensure_ascii=False)))
+    db.commit()
     return RedirectResponse(f"/pn/{pn}/bom", status_code=303)
 
 @app.post("/pn/{pn}/bom/{bom_id}/delete")
@@ -1016,4 +1012,50 @@ def api_pn_search(request: Request, q: str = "", limit: int = 12, db: Session = 
             }
             for r in rows
         ]
+    })
+
+
+@app.get("/admin/checks", response_class=HTMLResponse)
+def admin_checks(request: Request, db: Session = Depends(get_db)):
+    """Controlli di coerenza su costi e distinte gia presenti nel database."""
+    user = get_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+
+    parents_with_bom = {p for (p,) in db.query(BOMItem.parent_pn).distinct().all()}
+    non_make_with_bom = (
+        db.query(PartNumber)
+        .filter(PartNumber.pn.in_(parents_with_bom), func.upper(PartNumber.classificazione) != "MAKE")
+        .order_by(PartNumber.pn).all()
+    ) if parents_with_bom else []
+    zero_cost = (
+        db.query(PartNumber)
+        .filter(PartNumber.costo_standard == 0, ~PartNumber.pn.in_(parents_with_bom) if parents_with_bom else True)
+        .order_by(PartNumber.pn).all()
+    )
+    no_cost = (
+        db.query(PartNumber)
+        .filter(PartNumber.costo_standard.is_(None), ~PartNumber.pn.in_(parents_with_bom) if parents_with_bom else True,
+                PartNumber.stato != "OBSOLETO")
+        .order_by(PartNumber.pn).all()
+    )
+    dup_rows = (
+        db.query(BOMItem.parent_pn, BOMItem.child_pn, func.count(BOMItem.id))
+        .group_by(BOMItem.parent_pn, BOMItem.child_pn)
+        .having(func.count(BOMItem.id) > 1)
+        .order_by(BOMItem.parent_pn).all()
+    )
+    self_refs = db.query(BOMItem).filter(BOMItem.parent_pn == BOMItem.child_pn).all()
+    missing_children = (
+        db.query(BOMItem).outerjoin(PartNumber, PartNumber.pn == BOMItem.child_pn)
+        .filter(PartNumber.pn.is_(None)).all()
+    )
+    return templates.TemplateResponse("checks.html", {
+        "request": request, "user": user,
+        "non_make_with_bom": non_make_with_bom,
+        "zero_cost": zero_cost,
+        "no_cost": no_cost,
+        "dup_rows": dup_rows,
+        "self_refs": self_refs,
+        "missing_children": missing_children,
     })

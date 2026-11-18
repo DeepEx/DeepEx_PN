@@ -74,7 +74,7 @@ class PartNumber(Base):
     descrizione: Mapped[str | None] = mapped_column(String(500))
 
     classificazione: Mapped[str] = mapped_column(String(20), nullable=False, default="BUY")  # MAKE/BUY/STANDARD
-    costo_standard: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    costo_standard: Mapped[Decimal | None] = mapped_column(Numeric(14, 6))  # 6 decimali: componenti sotto il centesimo
     valuta: Mapped[str] = mapped_column(String(10), nullable=False, default="EUR")
 
     supplier_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("suppliers.id"))

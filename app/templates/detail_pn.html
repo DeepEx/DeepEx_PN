@@ -55,7 +55,7 @@
       <div style="height:10px"></div>
       <div class="help">Fornitore: <b>{{ item.supplier.name if item.supplier else "" }}</b></div>
       <div class="help">Codice fornitore: <span class="mono">{{ item.supplier_pn or "" }}</span></div>
-      <div class="help">Costo standard: <b>{{ item.costo_standard or "" }}</b> {{ item.valuta or "" }}</div>
+      <div class="help">Costo standard: <b>{% if item.costo_standard is not none %}{{ item.costo_standard|dec }}{% else %}—{% endif %}</b> {{ item.valuta or "" }}</div>
     </div>
 
     <div class="card" style="padding:14px">
