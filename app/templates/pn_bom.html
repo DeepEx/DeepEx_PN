@@ -29,6 +29,34 @@
       {% endif %}
     </div>
 
+    <div style="height:10px"></div>
+    <div class="row">
+      {% if mass_rollup and not mass_rollup.cycle_found %}
+        <span class="pill">Massa a secco: <b>{{ "%.2f"|format(mass_rollup.total / 1000) }}</b> kg</span>
+      {% endif %}
+      {% if water_rollup and not water_rollup.cycle_found %}
+        <span class="pill">Peso in acqua dolce: <b>{{ "%+.2f"|format(water_rollup.total / 1000) }}</b> kg
+          {% if water_rollup.total < 0 %}(galleggia){% elif water_rollup.total > 0 %}(affonda){% endif %}</span>
+      {% endif %}
+      {% set phys_missing = ((mass_rollup.missing_pns if mass_rollup else []) | list) + ((water_rollup.missing_pns if water_rollup else []) | list) %}
+      {% if phys_missing|length > 0 %}
+        <span class="pill" style="border-color: rgba(255,204,102,.35); color: var(--warn);">
+          Totali parziali: mancano pesi per {{ phys_missing|unique|list|length }} P/N
+        </span>
+      {% endif %}
+    </div>
+    {% if phys_missing|length > 0 %}
+      <div style="height:10px"></div>
+      <div class="card" style="padding:14px; border-color: rgba(255,204,102,.25);">
+        <div class="h2">Componenti senza massa o peso in acqua</div>
+        <div class="help">
+          {% for x in phys_missing|unique|sort %}
+            <a class="pill mono" href="/pn/{{ x }}/edit">{{ x }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
     {% if missing_cost_pns and missing_cost_pns|length > 0 %}
       <div style="height:10px"></div>
       <div class="card" style="padding:14px; border-color: rgba(255,204,102,.25);">

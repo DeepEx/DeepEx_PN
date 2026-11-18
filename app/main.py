@@ -1,4 +1,5 @@
 import os
+import json
 import csv, io, re
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
-from db import Base, engine, get_db
+from db import Base, engine, get_db, ensure_schema
 from models import Abbreviation, Supplier, PartNumber, User, PNHistory
 from auth import verify_password, require_user, SESSION_KEY, ensure_admin_user, get_user
 from pn import create_pn, create_pn_revision
@@ -18,7 +19,7 @@ from pn import create_pn, create_pn_revision
 from models import Abbreviation, PartNumber
 
 from decimal import Decimal
-from bom import compute_unit_cost
+from bom import compute_unit_cost, compute_physical_rollup
 from models import BOMItem
 from fastapi import Form
 from sqlalchemy import and_
@@ -41,6 +42,7 @@ templates = Jinja2Templates(directory="templates")
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    ensure_schema()
     # crea admin se mancante
     from db import SessionLocal
     db = SessionLocal()
@@ -519,6 +521,7 @@ def pn_edit_page(pn: str, request: Request, db: Session = Depends(get_db)):
             "error": None,
             "revision_error": None,
             "suggested_rev": _suggest_next_revision(item.rev),
+            "physical_sources": PHYSICAL_SOURCES,
         }
     )
 
@@ -538,6 +541,50 @@ def _suggest_next_revision(current_rev: str | None) -> str:
 
     return value
 
+PHYSICAL_SOURCES = ["MISURATO", "CAD", "DATASHEET", "STIMATO"]
+
+
+def _parse_decimal_field(raw: str, label: str, allow_negative: bool = False):
+    value = (raw or "").strip().replace(" ", "").replace(",", ".")
+    if not value:
+        return None
+    try:
+        number = Decimal(value)
+    except Exception:
+        raise ValueError(f"{label}: valore numerico non valido ({raw}).")
+    if not number.is_finite():
+        raise ValueError(f"{label}: valore numerico non valido ({raw}).")
+    if number < 0 and not allow_negative:
+        raise ValueError(f"{label}: il valore non puo essere negativo.")
+    return number.quantize(Decimal("0.1"))
+
+
+def _parse_physical_form(massa, peso_acqua, volume, lung, larg, alt, fonte, data, note):
+    from datetime import date as _date
+    result = {
+        "massa_secco_g": _parse_decimal_field(massa, "Massa a secco"),
+        "peso_acqua_g": _parse_decimal_field(peso_acqua, "Peso in acqua", allow_negative=True),
+        "volume_cm3": _parse_decimal_field(volume, "Volume"),
+        "dim_lunghezza_mm": _parse_decimal_field(lung, "Lunghezza"),
+        "dim_larghezza_mm": _parse_decimal_field(larg, "Larghezza"),
+        "dim_altezza_mm": _parse_decimal_field(alt, "Altezza"),
+    }
+    src = (fonte or "").strip().upper() or None
+    if src is not None and src not in PHYSICAL_SOURCES:
+        raise ValueError(f"Fonte proprieta fisiche non valida: {fonte}.")
+    result["proprieta_fonte"] = src
+    d = (data or "").strip()
+    if d:
+        try:
+            result["proprieta_data"] = _date.fromisoformat(d)
+        except ValueError:
+            raise ValueError(f"Data proprieta fisiche non valida: {data} (formato AAAA-MM-GG).")
+    else:
+        result["proprieta_data"] = None
+    result["proprieta_note"] = (note or "").strip() or None
+    return result
+
+
 @app.post("/pn/{pn}/edit")
 def pn_edit_submit(
     pn: str,
@@ -553,6 +600,15 @@ def pn_edit_submit(
     moq: str = Form(""),
     link: str = Form(""),
     note: str = Form(""),
+    massa_secco_g: str = Form(""),
+    peso_acqua_g: str = Form(""),
+    volume_cm3: str = Form(""),
+    dim_lunghezza_mm: str = Form(""),
+    dim_larghezza_mm: str = Form(""),
+    dim_altezza_mm: str = Form(""),
+    proprieta_fonte: str = Form(""),
+    proprieta_data: str = Form(""),
+    proprieta_note: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = get_user(request)
@@ -565,6 +621,30 @@ def pn_edit_submit(
 
     if item.stato == "OBSOLETO":
         return RedirectResponse(f"/pn/{pn}", status_code=303)
+
+    # proprieta fisiche
+    try:
+        phys = _parse_physical_form(
+            massa_secco_g, peso_acqua_g, volume_cm3,
+            dim_lunghezza_mm, dim_larghezza_mm, dim_altezza_mm,
+            proprieta_fonte, proprieta_data, proprieta_note,
+        )
+    except ValueError as e:
+        suppliers = db.query(Supplier).order_by(Supplier.name).all()
+        return templates.TemplateResponse(
+            "pn_edit.html",
+            {
+                "request": request,
+                "user": user,
+                "item": item,
+                "suppliers": suppliers,
+                "error": str(e),
+                "revision_error": None,
+                "suggested_rev": _suggest_next_revision(item.rev),
+                "physical_sources": PHYSICAL_SOURCES,
+            },
+            status_code=400,
+        )
 
     # parsing
     desc = descrizione.strip() or None
@@ -599,11 +679,18 @@ def pn_edit_submit(
     item.link = lk
     item.note = nt
 
+    phys_changes = {}
+    for key, value in phys.items():
+        old = getattr(item, key)
+        if (str(old) if old is not None else None) != (str(value) if value is not None else None):
+            phys_changes[key] = {"da": None if old is None else str(old), "a": None if value is None else str(value)}
+        setattr(item, key, value)
+
     db.add(PNHistory(
     pn=item.pn,
     user=user,
     action="UPDATE_META",
-    details_json=None,
+    details_json=json.dumps({"proprieta_fisiche": phys_changes}, ensure_ascii=False) if phys_changes else None,
     ))
 
     db.commit()
@@ -651,6 +738,7 @@ def pn_revision_submit(
                 "error": None,
                 "revision_error": f"Errore generazione revisione: {e}",
                 "suggested_rev": (new_rev or "").strip() or _suggest_next_revision(current_item.rev if current_item else ""),
+                "physical_sources": PHYSICAL_SOURCES,
             }
         )
 
@@ -703,6 +791,9 @@ def pn_bom_page(pn: str, request: Request, db: Session = Depends(get_db)):
     cache = {}
     res = compute_unit_cost(db, pn, cache, visiting=[])
 
+    mass_res = compute_physical_rollup(db, pn, "massa_secco_g", {}, visiting=[])
+    water_res = compute_physical_rollup(db, pn, "peso_acqua_g", {}, visiting=[])
+
     # costo righe (solo per mostrare breakdown)
     line_costs = []
     if not res.cycle_found:
@@ -735,6 +826,8 @@ def pn_bom_page(pn: str, request: Request, db: Session = Depends(get_db)):
             "missing_cost_pns": sorted(list(res.missing_cost_pns)),
             "cycle_found": res.cycle_found,
             "cycle_path": res.cycle_path,
+            "mass_rollup": mass_res,
+            "water_rollup": water_res,
             "error": None,
         }
     )

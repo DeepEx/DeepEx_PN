@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Numeric, UniqueConstraint, Text
+from sqlalchemy import String, Integer, DateTime, Date, ForeignKey, Numeric, UniqueConstraint, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from sqlalchemy import Boolean
@@ -8,7 +8,7 @@ from sqlalchemy.orm import relationship
 from db import Base
 
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 
 from sqlalchemy.orm import joinedload
 
@@ -93,6 +93,17 @@ class PartNumber(Base):
 
     link: Mapped[str | None] = mapped_column(String(500))
     note: Mapped[str | None] = mapped_column(Text)
+
+    # Proprieta fisiche (per bilancio masse e galleggiamento)
+    massa_secco_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 1))      # massa in aria [g]
+    peso_acqua_g: Mapped[Decimal | None] = mapped_column(Numeric(12, 1))       # peso apparente in acqua dolce [g]; negativo = galleggia
+    volume_cm3: Mapped[Decimal | None] = mapped_column(Numeric(14, 1))         # volume spostato [cm3]
+    dim_lunghezza_mm: Mapped[Decimal | None] = mapped_column(Numeric(10, 1))
+    dim_larghezza_mm: Mapped[Decimal | None] = mapped_column(Numeric(10, 1))   # per i cilindri: diametro
+    dim_altezza_mm: Mapped[Decimal | None] = mapped_column(Numeric(10, 1))     # per i cilindri: diametro
+    proprieta_fonte: Mapped[str | None] = mapped_column(String(20))            # MISURATO/CAD/DATASHEET/STIMATO
+    proprieta_data: Mapped[date | None] = mapped_column(Date)
+    proprieta_note: Mapped[str | None] = mapped_column(Text)
 
 
 class PNHistory(Base):

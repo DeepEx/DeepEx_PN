@@ -76,3 +76,56 @@ def compute_unit_cost(db: Session, pn: str, cache: Dict[str, Decimal], visiting:
     visiting.pop()
     cache[pn] = total
     return CostResult(cost=total, missing_cost_pns=missing, cycle_found=False, cycle_path=[])
+
+
+@dataclass
+class PhysicalResult:
+    total: Decimal
+    missing_pns: Set[str]
+    cycle_found: bool
+    cycle_path: List[str]
+
+
+def compute_physical_rollup(db: Session, pn: str, attr: str, cache: Dict[str, PhysicalResult], visiting: List[str]) -> PhysicalResult:
+    """Somma una proprieta fisica (es. massa_secco_g, peso_acqua_g) lungo la BOM.
+
+    Un valore inserito direttamente sul P/N (anche di un assieme) ha la precedenza:
+    una pesata dell'assieme intero vale piu della somma dei componenti.
+    Se manca, si somma la BOM (qty, senza scarto); un P/N senza valore e senza BOM e mancante.
+    """
+    if pn in visiting:
+        i = visiting.index(pn)
+        return PhysicalResult(Decimal("0"), set(), True, visiting[i:] + [pn])
+    if pn in cache:
+        return cache[pn]
+
+    obj = db.get(PartNumber, pn)
+    if not obj:
+        return PhysicalResult(Decimal("0"), {pn}, False, [])
+
+    own = getattr(obj, attr)
+    if own is not None:
+        res = PhysicalResult(_to_decimal(own), set(), False, [])
+        cache[pn] = res
+        return res
+
+    rows = db.query(BOMItem).filter(BOMItem.parent_pn == pn).all()
+    if not rows:
+        res = PhysicalResult(Decimal("0"), {pn}, False, [])
+        cache[pn] = res
+        return res
+
+    visiting.append(pn)
+    total = Decimal("0")
+    missing: Set[str] = set()
+    for r in rows:
+        child = compute_physical_rollup(db, r.child_pn, attr, cache, visiting)
+        if child.cycle_found:
+            visiting.pop()
+            return child
+        missing |= child.missing_pns
+        total += _to_decimal(r.qty) * child.total
+    visiting.pop()
+    res = PhysicalResult(total, missing, False, [])
+    cache[pn] = res
+    return res
